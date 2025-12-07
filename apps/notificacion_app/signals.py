@@ -27,10 +27,11 @@ except ImportError as e:
     Match = None
 
 try:
-    from apps.chat_app.models import Mensaje
+    from apps.chat_app.models import Mensaje, Chat
 except ImportError as e:
-    logger.warning(f"No se pudo importar Mensaje: {e}")
+    logger.warning(f"No se pudo importar Mensaje/Chat: {e}")
     Mensaje = None
+    Chat = None
 
 
 # --------------------------------------------------------
@@ -106,6 +107,7 @@ if Match is not None:
     def crear_notificacion_desde_match(sender, instance, created, **kwargs):
         """
         Crea notificaciones para ambos usuarios cuando hay un match.
+        Incluye chat_id para que el frontend pueda redirigir al chat.
         """
         if not created:
             return
@@ -118,6 +120,17 @@ if Match is not None:
         if not user_a or not user_b:
             logger.warning("Usuarios del match no encontrados")
             return
+
+        # Intentar obtener el chat asociado al match
+        chat_id = None
+        if Chat is not None:
+            try:
+                chat = Chat.objects.filter(match=instance).first()
+                if chat:
+                    chat_id = chat.id
+                    logger.info(f"Chat id={chat_id} encontrado para Match id={instance.id}")
+            except Exception as e:
+                logger.warning(f"No se pudo obtener chat para match: {e}")
 
         # Para usuario A
         try:
@@ -134,6 +147,7 @@ if Match is not None:
                 "mensaje": notif_a.mensaje,
                 "fecha_envio": notif_a.fecha_envio.isoformat(),
                 "usuario_match_id": user_b.id,
+                "chat_id": chat_id,  # Incluir chat_id para navegación
             }
             
             transaction.on_commit(
@@ -163,6 +177,7 @@ if Match is not None:
                 "mensaje": notif_b.mensaje,
                 "fecha_envio": notif_b.fecha_envio.isoformat(),
                 "usuario_match_id": user_a.id,
+                "chat_id": chat_id,  # Incluir chat_id para navegación
             }
             
             transaction.on_commit(
